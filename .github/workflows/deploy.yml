@@ -1,32 +1,13 @@
-name: 🚀 Deploy to EC2
+- name: Write key
+  run: |
+    echo "${{ secrets.EC2_SSH_KEY }}" > key.pem
+    chmod 600 key.pem
 
-on:
-  push:
-    branches: [master]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: 📦 Checkout code
-      uses: actions/checkout@v3
-
-    - name: 🔑 Setup SSH
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
-
-    - name: 🛠 Deploy to EC2
-      run: |
-        ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP  }} << 'EOF'
-          cd ~/road-ai-mlops
-          git pull origin master
-
-          echo "🔁 (Optional) Register latest ONNX models to MLflow"
-          python3 scripts/register_models.py || true
-
-          echo "🐳 Rebuild and restart Docker container"
-          docker compose -f docker-compose.prod.yml down
-          docker compose -f docker-compose.prod.yml up --build -d
-        EOF
+- name: 🛠 Deploy to EC2
+  run: |
+    ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
+      cd ~/road-ai-mlops
+      git pull origin master
+      docker compose -f docker-compose.prod.yml down
+      docker compose -f docker-compose.prod.yml up --build -d
+    EOF
