@@ -19,14 +19,19 @@ jobs:
 
     - name: 🛠 Deploy to EC2
       run: |
-        ssh -tt -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
+        ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
+          echo "✅ Connected to EC2"
+
           cd ~/road-ai-mlops
+          echo "📥 Pulling latest code from GitHub..."
           git pull origin master
 
-          echo "🔁 Register latest ONNX models to MLflow (optional)"
-          python3 scripts/register_models.py || true
+          echo "📦 Registering latest ONNX models to MLflow (optional)"
+          python3 scripts/register_models.py || echo "⚠️ Skipped model registration"
 
-          echo "🐳 Rebuild and restart Docker containers"
+          echo "🐳 Rebuilding and restarting Docker containers"
           docker compose -f docker-compose.prod.yml down
           docker compose -f docker-compose.prod.yml up --build -d
+
+          echo "✅ Deployment complete"
         EOF
