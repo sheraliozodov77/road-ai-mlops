@@ -9,3 +9,5 @@ opencv-python-headless
 pillow
 mlflow
 wandb
+onnxruntime
+boto3
