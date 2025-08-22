@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import onnxruntime as ort
+import os
 from .inference_registry import load_model_from_registry_or_local
 
 # =========================
@@ -25,19 +26,21 @@ YOLO_CLASSES = [
 ]
 
 # =========================
-# Load Models from MLflow Registry with Fallback
+# Load Models from MLflow Registry with S3 fallback
 # =========================
 
 segformer_model = load_model_from_registry_or_local(
     model_name="SegFormer-RoadAI",
     stage="Production",
-    local_path="models/segformer/segformer-b4-uavid.onnx"
+    local_path="models/segformer/segformer-b4-uavid.onnx",
+    s3_key=os.environ.get("SEGFORMER_S3_KEY")
 )
 
 yolov11_model = load_model_from_registry_or_local(
     model_name="YOLOv11-RoadAI",
     stage="Production",
-    local_path="models/yolov11/yolov11m.onnx"
+    local_path="models/yolov11/yolov11m.onnx",
+    s3_key=os.environ.get("YOLOV11_S3_KEY")
 )
 
 # =========================
