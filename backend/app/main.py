@@ -6,7 +6,7 @@ import shutil
 import os
 import uuid
 import cv2
-from inference.inference import (
+from app.inference.inference import (
     load_onnx_model, run_segformer, run_yolov11
 )
 import numpy as np

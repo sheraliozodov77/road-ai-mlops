@@ -1,4 +1,6 @@
 # backend/start_backend.py
+import sys
+sys.path.append("/app")
 
 import os
 from fastapi import FastAPI
