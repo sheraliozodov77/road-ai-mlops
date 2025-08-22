@@ -16,6 +16,8 @@ services:
     command: streamlit run streamlit_app/main.py --server.port=8501 --server.address=0.0.0.0
     ports:
       - "8501:8501"
+    environment:
+      - API_URL=${API_URL}
     restart: always
     env_file:
       - .env

@@ -1,14 +1,18 @@
 # streamlit_app/main.py
+
 import streamlit as st
 import requests
 import base64
 from PIL import Image
 import io
+import os
+import time
 
 st.set_page_config(page_title="🚧 Road AI Demo", layout="wide")
 st.title("🛣️ Road Segmentation & Defect Detection")
 
-API_URL = st.secrets.get("API_URL", "http://localhost:8000")
+# ✅ Use environment variable instead of st.secrets
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 model_type = st.sidebar.selectbox("Choose Model", ["segformer", "yolov11"])
 input_type = st.sidebar.radio("Input Type", ["Image", "Video"])
@@ -45,7 +49,6 @@ elif input_type == "Video":
             st.success(f"Job started: {job_id}")
 
             with st.spinner("Processing video..."):
-                import time
                 status = "processing"
                 while status == "processing":
                     job_status = requests.get(f"{API_URL}/jobs/status", params={"job_id": job_id})
@@ -60,11 +63,13 @@ elif input_type == "Video":
         else:
             st.error("API Error: " + str(response.text))
 
-
 with st.expander("📜 History (last 5)"):
-    hist = requests.get(f"{API_URL}/history")
-    if hist.status_code == 200:
-        for row in hist.json():
-            st.write(f"[{row['timestamp']}] {row['model']} ({row['type']}) — Runtime: {row['runtime']}")
-    else:
-        st.write("No history found.")
+    try:
+        hist = requests.get(f"{API_URL}/history")
+        if hist.status_code == 200:
+            for row in hist.json():
+                st.write(f"[{row['timestamp']}] {row['model']} ({row['type']}) — Runtime: {row['runtime']}")
+        else:
+            st.write("No history found.")
+    except Exception as e:
+        st.error(f"Failed to fetch history: {e}")
