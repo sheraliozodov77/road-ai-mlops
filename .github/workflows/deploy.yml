@@ -21,7 +21,7 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
           cd ~/road-ai-mlops
-          git pull origin main
+          git pull origin master
 
           echo "🔁 (Optional) Register latest ONNX models to MLflow"
           python3 scripts/register_models.py || true
