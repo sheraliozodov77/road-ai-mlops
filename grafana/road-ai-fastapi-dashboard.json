@@ -1,0 +1,77 @@
+{
+  "id": null,
+  "title": "🚦 Road-AI FastAPI Monitoring",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Request Count (by Endpoint)",
+      "targets": [
+        {
+          "expr": "increase(request_count[1m])",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "xaxis": { "show": true },
+      "yaxes": [{ "format": "short" }, { "format": "short" }],
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Request Latency (avg)",
+      "targets": [
+        {
+          "expr": "rate(request_latency_seconds_sum[1m]) / rate(request_latency_seconds_count[1m])",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "B"
+        }
+      ],
+      "xaxis": { "show": true },
+      "yaxes": [
+        { "format": "s", "label": "seconds" },
+        { "format": "short" }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "stat",
+      "title": "Total Inferences (last 5m)",
+      "targets": [
+        {
+          "expr": "sum(increase(request_count[5m]))",
+          "refId": "C"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 9, "w": 6, "h": 4 },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Last Image Prediction Latency",
+      "targets": [
+        {
+          "expr": "last_over_time(request_latency_seconds_sum{endpoint=\"/predict/image\"}[5m])",
+          "refId": "D"
+        }
+      ],
+      "gridPos": { "x": 6, "y": 9, "w": 6, "h": 4 }
+    },
+    {
+      "type": "stat",
+      "title": "Last Video Prediction Latency",
+      "targets": [
+        {
+          "expr": "last_over_time(request_latency_seconds_sum{endpoint=\"/predict/video\"}[5m])",
+          "refId": "E"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 9, "w": 6, "h": 4 }
+    }
+  ],
+  "schemaVersion": 35,
+  "version": 1
+}

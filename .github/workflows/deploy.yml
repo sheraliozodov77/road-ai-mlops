@@ -1,0 +1,32 @@
+name: 🚀 Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📦 Checkout code
+      uses: actions/checkout@v3
+
+    - name: 🔑 Setup SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+    - name: 🛠 Deploy to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+          cd ~/road-ai-mlops
+          git pull origin main
+
+          echo "🔁 (Optional) Register latest ONNX models to MLflow"
+          python3 scripts/register_models.py || true
+
+          echo "🐳 Rebuild and restart Docker container"
+          docker compose -f docker-compose.prod.yml down
+          docker compose -f docker-compose.prod.yml up --build -d
+        EOF

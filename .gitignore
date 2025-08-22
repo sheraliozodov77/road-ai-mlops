@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.pkl
+
+# Jupyter/IPython
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# Environment files
+.env
+.env.prod
+*.env
+
+# Models / data
+models/**/*.pt
+models/**/*.ckpt
+models/**/*.onnx
+temp/
+data/
+
+# Docker
+*.log
+*.pid
+
+# OS
+.DS_Store
+Thumbs.db

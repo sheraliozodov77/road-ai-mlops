@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+boto3
+sqlalchemy
+psycopg2-binary
+python-multipart
+prometheus_client
+opencv-python-headless
+pillow
+mlflow
+wandb
