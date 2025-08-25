@@ -26,12 +26,13 @@ jobs:
           echo "Pulling latest code from GitHub..."
           git pull origin master
 
-          echo "Registering latest ONNX models to MLflow (optional)"
-          python3 scripts/register_models.py || echo "⚠️ Skipped model registration"
-
           echo "Rebuilding and restarting Docker containers"
           docker compose -f docker-compose.prod.yml down
           docker compose -f docker-compose.prod.yml up --build -d
 
-          echo "✅ Deployment complete"
+          echo "Registering latest ONNX models to MLflow (inside container)"
+          docker compose -f docker-compose.prod.yml exec backend python scripts/register_models.py || echo "⚠️ Skipped model registration"
+
+          echo "🚀 Deployment complete"
+          exit 0
         EOF
