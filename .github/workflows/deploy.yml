@@ -1,4 +1,4 @@
-name: "🚀 Deploy to EC2"
+name: "Deploy to EC2"
 
 on:
   push:
@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 📦 Checkout code
+    - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: 🔑 Setup SSH
+    - name: Setup SSH
       uses: webfactory/ssh-agent@v0.9.0
       with:
         ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
@@ -20,16 +20,16 @@ jobs:
     - name: 🛠 Deploy to EC2
       run: |
         ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
-          echo "✅ Connected to EC2"
+          echo "Connected to EC2"
 
           cd ~/road-ai-mlops
-          echo "📥 Pulling latest code from GitHub..."
+          echo "Pulling latest code from GitHub..."
           git pull origin master
 
-          echo "📦 Registering latest ONNX models to MLflow (optional)"
+          echo "Registering latest ONNX models to MLflow (optional)"
           python3 scripts/register_models.py || echo "⚠️ Skipped model registration"
 
-          echo "🐳 Rebuilding and restarting Docker containers"
+          echo "Rebuilding and restarting Docker containers"
           docker compose -f docker-compose.prod.yml down
           docker compose -f docker-compose.prod.yml up --build -d
 
