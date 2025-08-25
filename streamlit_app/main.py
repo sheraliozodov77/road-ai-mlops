@@ -73,3 +73,4 @@ with st.expander("📜 History (last 5)"):
             st.write("No history found.")
     except Exception as e:
         st.error(f"Failed to fetch history: {e}")
+        
