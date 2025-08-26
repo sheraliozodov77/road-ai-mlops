@@ -4,6 +4,7 @@ import mlflow
 import onnxruntime as ort
 import boto3
 import botocore
+import json
 
 
 def download_model_from_s3(s3_key: str, local_path: str):

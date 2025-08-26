@@ -1,3 +1,20 @@
+# ✅ app/monitoring/metrics.py (Corrected)
+
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi import APIRouter, Request, Response
+import time
+
+REQUEST_COUNT = Counter("request_count", "Total API requests", ["method", "endpoint"])
+REQUEST_LATENCY = Histogram("request_latency_seconds", "API request latency", ["method", "endpoint"])
+
+router = APIRouter()
+
+@router.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+# ✅ app/main.py (Corrected)
+
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
@@ -8,6 +25,8 @@ import cv2
 import numpy as np
 import io
 import base64
+import time
+import json
 from datetime import datetime
 
 from app.inference.inference import (
@@ -19,9 +38,25 @@ from app.db.models import Prediction
 from app.utils.s3 import upload_file_to_s3
 from app.tracking.logger import log_inference_metrics
 from app.monitoring.metrics import router as metrics_router
+from prometheus_client import Counter, Histogram
 
 app = FastAPI(title="🚦 Road AI Inference API")
 app.include_router(metrics_router)
+
+# Add Prometheus middleware to FastAPI app
+REQUEST_COUNT = Counter("request_count", "Total API requests", ["method", "endpoint"])
+REQUEST_LATENCY = Histogram("request_latency_seconds", "API request latency", ["method", "endpoint"])
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next):
+    method = request.method
+    endpoint = request.url.path
+    REQUEST_COUNT.labels(method=method, endpoint=endpoint).inc()
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+    REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(duration)
+    return response
 
 app.add_middleware(
     CORSMiddleware,

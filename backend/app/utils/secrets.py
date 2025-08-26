@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
 import boto3
+import json
+import os
 
 def load_secrets(secret_name: str = "road-ai-prod-secret", region: str = "us-east-1"):
     try:
