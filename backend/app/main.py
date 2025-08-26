@@ -1,4 +1,3 @@
-# backend/app/main.py
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
@@ -6,21 +5,22 @@ import shutil
 import os
 import uuid
 import cv2
-from app.inference.inference import (
-    load_onnx_model, run_segformer, run_yolov11
-)
 import numpy as np
 import io
 import base64
+from datetime import datetime
+
+from app.inference.inference import (
+    load_onnx_model, run_segformer, run_yolov11
+)
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models import Prediction
-from datetime import datetime
 from app.utils.s3 import upload_file_to_s3
 from app.tracking.logger import log_inference_metrics
 from app.monitoring.metrics import router as metrics_router
 
-app = FastAPI(title="🚣️ Road AI Inference API")
+app = FastAPI(title="🚦 Road AI Inference API")
 app.include_router(metrics_router)
 
 app.add_middleware(
@@ -33,8 +33,13 @@ app.add_middleware(
 SEG_MODEL_PATH = "models/segformer/segformer-b4-uavid.onnx"
 YOL_MODEL_PATH = "models/yolov11/yolov11m.onnx"
 
-segformer_model = load_onnx_model(SEG_MODEL_PATH)
-yolov11_model = load_onnx_model(YOL_MODEL_PATH)
+# Load ONNX models
+try:
+    segformer_model = load_onnx_model(SEG_MODEL_PATH)
+    yolov11_model = load_onnx_model(YOL_MODEL_PATH)
+except Exception as e:
+    print(f"❌ Model loading failed: {e}")
+    raise e
 
 def read_image(file: UploadFile):
     from PIL import Image

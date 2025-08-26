@@ -37,7 +37,7 @@ mlflow.set_experiment("RoadAI-Inference")
 wandb.init(project="road-ai-inference", name="inference-logs", mode="online")
 
 # =========================
-# Load Models
+# Load Models (from registry or local)
 # =========================
 
 segformer_model = load_model_from_registry_or_local(
@@ -55,7 +55,7 @@ yolov11_model = load_model_from_registry_or_local(
 )
 
 # =========================
-# SegFormer Inference
+# Inference Methods
 # =========================
 
 def run_segformer(model_session, img_bgr, size=1024):
@@ -76,20 +76,15 @@ def run_segformer(model_session, img_bgr, size=1024):
 
     latency = time.time() - start
 
-    # Log to MLflow
     with mlflow.start_run(run_name="segformer_inference", nested=True):
         mlflow.log_param("model", "SegFormer")
         mlflow.log_param("input_size", size)
         mlflow.log_metric("latency", latency)
 
-    # Log to W&B
     wandb.log({"segformer_latency": latency})
 
     return mask, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
 
-# =========================
-# YOLOv11 Inference
-# =========================
 
 def run_yolov11(model_session, img_bgr, size=640):
     start = time.time()
@@ -117,14 +112,25 @@ def run_yolov11(model_session, img_bgr, size=640):
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
         cv2.putText(img, f"{label} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-    # Log to MLflow
     with mlflow.start_run(run_name="yolov11_inference", nested=True):
         mlflow.log_param("model", "YOLOv11")
         mlflow.log_param("input_size", size)
         mlflow.log_metric("latency", latency)
         mlflow.log_metric("detections", detections)
 
-    # Log to W&B
     wandb.log({"yolov11_latency": latency, "detections": detections})
 
     return img
+
+
+# =========================
+# Local ONNX Loader (used by FastAPI)
+# =========================
+
+def load_onnx_model(model_path):
+    print(f"🔍 Loading ONNX model from: {model_path}")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"❌ Model not found: {model_path}")
+    session = ort.InferenceSession(model_path)
+    print("✅ ONNX model loaded successfully!")
+    return session
