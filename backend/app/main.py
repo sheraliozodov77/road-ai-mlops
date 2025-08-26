@@ -1,21 +1,4 @@
-# ✅ app/monitoring/metrics.py (Corrected)
-
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from fastapi import APIRouter, Request, Response
-import time
-
-REQUEST_COUNT = Counter("request_count", "Total API requests", ["method", "endpoint"])
-REQUEST_LATENCY = Histogram("request_latency_seconds", "API request latency", ["method", "endpoint"])
-
-router = APIRouter()
-
-@router.get("/metrics")
-async def metrics():
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-
-# ✅ app/main.py (Corrected)
-
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Depends
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 import shutil
@@ -37,16 +20,19 @@ from app.db.session import get_db
 from app.db.models import Prediction
 from app.utils.s3 import upload_file_to_s3
 from app.tracking.logger import log_inference_metrics
-from app.monitoring.metrics import router as metrics_router
-from prometheus_client import Counter, Histogram
+from app.monitoring.metrics import (
+    router as metrics_router,
+    REQUEST_COUNT,
+    REQUEST_LATENCY,
+)
 
+# Initialize FastAPI
 app = FastAPI(title="🚦 Road AI Inference API")
+
+# Register metrics route
 app.include_router(metrics_router)
 
-# Add Prometheus middleware to FastAPI app
-REQUEST_COUNT = Counter("request_count", "Total API requests", ["method", "endpoint"])
-REQUEST_LATENCY = Histogram("request_latency_seconds", "API request latency", ["method", "endpoint"])
-
+# Prometheus middleware
 @app.middleware("http")
 async def prometheus_metrics_middleware(request: Request, call_next):
     method = request.method
@@ -58,6 +44,7 @@ async def prometheus_metrics_middleware(request: Request, call_next):
     REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(duration)
     return response
 
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -65,10 +52,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Load ONNX models
 SEG_MODEL_PATH = "models/segformer/segformer-b4-uavid.onnx"
 YOL_MODEL_PATH = "models/yolov11/yolov11m.onnx"
 
-# Load ONNX models
 try:
     segformer_model = load_onnx_model(SEG_MODEL_PATH)
     yolov11_model = load_onnx_model(YOL_MODEL_PATH)
