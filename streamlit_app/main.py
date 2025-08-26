@@ -12,7 +12,7 @@ st.set_page_config(page_title="🚧 Road AI Demo", layout="wide")
 st.title("🛣️ Road Segmentation & Defect Detection")
 
 # ✅ Use environment variable instead of st.secrets
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+API_URL = os.getenv("API_URL", "http://backend:8000")
 
 model_type = st.sidebar.selectbox("Choose Model", ["segformer", "yolov11"])
 input_type = st.sidebar.radio("Input Type", ["Image", "Video"])
