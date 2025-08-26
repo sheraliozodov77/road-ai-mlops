@@ -61,21 +61,31 @@ yolov11_model = load_model_from_registry_or_local(
 def run_segformer(model_session, img_bgr, size=1024):
     start = time.time()
 
+    # Step 1: Convert and resize input
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     img_resized = cv2.resize(img_rgb, (size, size))
+
+    # Step 2: Normalize input
     x = img_resized.astype(np.float32) / 255.0
     x = (x - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
     x = np.transpose(x, (2, 0, 1))
     x = np.expand_dims(x, axis=0).astype(np.float32)
 
+    # Step 3: Inference
     ort_inputs = {model_session.get_inputs()[0].name: x}
     ort_outs = model_session.run(None, ort_inputs)
     mask = np.argmax(ort_outs[0], axis=1).squeeze(0).astype(np.uint8)
     color_mask = INDEX_TO_COLOR[mask]
-    overlay = cv2.addWeighted(img_rgb, 0.55, color_mask, 0.45, 0.0)
+
+    # Step 4: Resize color mask to match original image
+    color_mask_resized = cv2.resize(color_mask, (img_bgr.shape[1], img_bgr.shape[0]))
+
+    # Step 5: Blend
+    overlay = cv2.addWeighted(img_rgb, 0.55, color_mask_resized, 0.45, 0.0)
 
     latency = time.time() - start
 
+    # Step 6: Log to MLflow & W&B
     with mlflow.start_run(run_name="segformer_inference", nested=True):
         mlflow.log_param("model", "SegFormer")
         mlflow.log_param("input_size", size)
