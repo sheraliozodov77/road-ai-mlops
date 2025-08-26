@@ -75,13 +75,39 @@ def run_segformer(model_session, img_bgr, size=1024):
     ort_inputs = {model_session.get_inputs()[0].name: x}
     ort_outs = model_session.run(None, ort_inputs)
     mask = np.argmax(ort_outs[0], axis=1).squeeze(0).astype(np.uint8)
-    color_mask = INDEX_TO_COLOR[mask]
 
-    # Step 4: Resize color mask to match original image
-    color_mask_resized = cv2.resize(color_mask, (img_bgr.shape[1], img_bgr.shape[0]))
+    # Resize mask to original resolution
+    mask_resized = cv2.resize(mask, (img_bgr.shape[1], img_bgr.shape[0]), interpolation=cv2.INTER_NEAREST)
+    color_mask = INDEX_TO_COLOR[mask_resized]
 
-    # Step 5: Blend
-    overlay = cv2.addWeighted(img_rgb, 0.55, color_mask_resized, 0.45, 0.0)
+    # Step 4: Overlay label names on image
+    label_map = {
+        1: "moving car",
+        2: "building",
+        3: "human",
+        4: "vegetation",
+        5: "static car",
+        6: "road",
+        7: "low vegetation"
+    }
+
+    overlay = img_rgb.copy()
+    for class_id, label in label_map.items():
+        class_mask = (mask_resized == class_id).astype(np.uint8) * 255
+        contours, _ = cv2.findContours(class_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for cnt in contours:
+            if cv2.contourArea(cnt) < 800:
+                continue
+            x, y, w, h = cv2.boundingRect(cnt)
+            cv2.putText(
+                overlay, label, (x, y - 8),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                (255, 255, 255), 2, cv2.LINE_AA
+            )
+
+    # Step 5: Blend final overlay
+    final_overlay = cv2.addWeighted(overlay, 0.55, color_mask, 0.45, 0.0)
 
     latency = time.time() - start
 
@@ -93,7 +119,8 @@ def run_segformer(model_session, img_bgr, size=1024):
 
     wandb.log({"segformer_latency": latency})
 
-    return mask, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
+    return mask_resized, cv2.cvtColor(final_overlay, cv2.COLOR_RGB2BGR)
+
 
 
 def run_yolov11(model_session, img_bgr, size=640):
