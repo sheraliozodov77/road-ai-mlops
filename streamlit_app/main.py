@@ -1,5 +1,3 @@
-# ✅ Final Streamlit Frontend (Production-Ready for POC)
-
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
@@ -10,8 +8,9 @@ import os
 import time
 
 st.set_page_config(page_title="Road AI Demo", layout="wide")
+
 st.title("🛣️ Road Segmentation & Defect Detection")
-st.caption("FastAPI · Streamlit · ONNX · YOLOv11 · SegFormer · MLflow · W&B · Docker")
+st.caption("FastAPI · Streamlit · ONNX · YOLOv11 · SegFormer · MLflow · W&B · Docker · AWS")
 
 API_URL = os.getenv("API_URL", "http://backend:8000")
 
@@ -49,6 +48,8 @@ model_type = st.sidebar.selectbox("Model", ["segformer", "yolov11"])
 input_type = st.sidebar.radio("Input Type", ["Image", "Video"])
 st.sidebar.markdown("---")
 st.sidebar.info("Inference powered by ONNX models on AWS EC2.")
+st.sidebar.markdown("---")
+st.sidebar.markdown("<p style='font-size:12px;'>Made by Sherali Ozodov</p>", unsafe_allow_html=True)
 
 # =========================
 # IMAGE INPUT
@@ -73,12 +74,17 @@ if input_type == "Image":
                 st.image(uploaded_file, caption="Original Input", use_container_width=True)
             with col2:
                 st.image(result_image, caption="Predicted Output", use_container_width=True)
-                st.download_button("Download Prediction", data=base64.b64decode(result), file_name="prediction.png", mime="image/png")
+                st.download_button(
+                    "Download Prediction",
+                    data=base64.b64decode(result),
+                    file_name="prediction.png",
+                    mime="image/png"
+                )
                 if model_type == "segformer":
                     render_legend(CLASS_LEGEND)
-            st.success(f"Prediction completed in {end - start:.2f} seconds")
+            st.success(f"✅ Prediction completed in {end - start:.2f} seconds")
         else:
-            st.error("API Error: " + str(response.text))
+            st.error("❌ API Error: " + str(response.text))
 
 # =========================
 # VIDEO INPUT
@@ -105,29 +111,23 @@ elif input_type == "Video":
             if status == "completed":
                 video_url = job_status.json().get("output_url")
                 st.video(f"{API_URL}{video_url}")
-                st.success(f"Inference finished in {end - start:.2f} seconds")
+                st.success(f"✅ Video inference finished in {end - start:.2f} seconds")
             else:
-                st.error("Job failed or not found.")
+                st.error("❌ Job failed or not found.")
         else:
-            st.error("API Error: " + str(response.text))
+            st.error("❌ API Error: " + str(response.text))
 
 # =========================
 # History Viewer
 # =========================
 with st.expander("📜 Inference History"):
     try:
-        hist = requests.get(f"{API_URL}/history")
+        hist = requests.get(f"{API_URL}/history", timeout=2)
         if hist.status_code == 200:
             rows = hist.json()
             for row in rows[:15]:
                 st.markdown(f"**[{row['timestamp']}]** — `{row['model']}` ({row['type']}) | Runtime: `{row['runtime']}`")
         else:
             st.warning("No history found.")
-    except Exception as e:
-        st.error(f"Failed to fetch history: {e}")
-
-# =========================
-# Footer
-# =========================
-st.markdown("---")
-st.markdown("**Made by Sherali Ozodov | Full MLOps Stack: FastAPI · Streamlit · ONNX · AWS EC2 · MLflow · W&B**")
+    except:
+        st.info("History will be available after your first prediction.")
