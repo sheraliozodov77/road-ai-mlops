@@ -47,50 +47,63 @@ model_type = st.sidebar.selectbox("Model", ["segformer", "yolov11"])
 input_type = st.sidebar.radio("Input Type", ["Image", "Video"])
 
 # =========================
-# IMAGE INPUT
+# IMAGE INPUT with state management
 # =========================
 if input_type == "Image":
-    uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+    # Initialize session state
+    if "uploaded_image" not in st.session_state:
+        st.session_state.uploaded_image = None
+        st.session_state.predicted_image = None
+        st.session_state.predicted_result = None
+        st.session_state.prediction_time = None
 
-    if uploaded_file and "prediction_result" not in st.session_state:
-        with st.spinner("Running inference..."):
-            start = time.time()
-            files = {"file": uploaded_file.getvalue()}
-            data = {"model_type": model_type}
-            response = requests.post(f"{API_URL}/predict/image", files=files, data=data)
-            end = time.time()
+    # Upload or reset
+    uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], label_visibility="collapsed", key="image_upload")
+    
+    if uploaded_file:
+        # If new file uploaded, reset previous states
+        if st.session_state.uploaded_image != uploaded_file:
+            st.session_state.uploaded_image = uploaded_file
+            st.session_state.predicted_image = None
+            st.session_state.predicted_result = None
+            st.session_state.prediction_time = None
 
-        if response.status_code == 200 and response.json().get("status") == "success":
-            result_base64 = response.json()["result"]
-            s3_url = response.json()["url"]
-            result_bytes = base64.b64decode(result_base64)
-            result_image = Image.open(io.BytesIO(result_bytes))
+            # Run prediction
+            with st.spinner("Running inference..."):
+                start = time.time()
+                files = {"file": uploaded_file.getvalue()}
+                data = {"model_type": model_type}
+                response = requests.post(f"{API_URL}/predict/image", files=files, data=data)
+                end = time.time()
 
-            st.session_state.prediction_result = {
-                "original": uploaded_file,
-                "result_img": result_image,
-                "result_bytes": result_bytes,
-                "runtime": end - start
-            }
-        else:
-            st.error("❌ API Error: " + str(response.text))
+            if response.status_code == 200 and response.json().get("status") == "success":
+                result = response.json()["result"]
+                result_image = Image.open(io.BytesIO(base64.b64decode(result)))
 
-    if "prediction_result" in st.session_state:
+                st.session_state.predicted_image = result_image
+                st.session_state.predicted_result = result
+                st.session_state.prediction_time = round(end - start, 2)
+            else:
+                st.error("API Error: " + str(response.text))
+
+    # If prediction exists in session state, show result
+    if st.session_state.uploaded_image and st.session_state.predicted_image:
         col1, col2 = st.columns(2)
         with col1:
-            st.image(st.session_state.prediction_result["original"], caption="Original Input", use_container_width=True)
+            st.image(st.session_state.uploaded_image, caption="Original Input", use_container_width=True)
         with col2:
-            st.image(st.session_state.prediction_result["result_img"], caption="Predicted Output", use_container_width=True)
+            st.image(st.session_state.predicted_image, caption="Predicted Output", use_container_width=True)
             st.download_button(
                 "Download Prediction",
-                data=st.session_state.prediction_result["result_bytes"],
+                data=base64.b64decode(st.session_state.predicted_result),
                 file_name="prediction.png",
                 mime="image/png"
             )
             if model_type == "segformer":
                 render_legend(CLASS_LEGEND)
-        st.success(f"✅ Prediction completed in {st.session_state.prediction_result['runtime']:.2f} seconds")
+        st.success(f"✅ Prediction completed in {st.session_state.prediction_time:.2f} seconds")
 
+        
 # =========================
 # VIDEO INPUT
 # =========================
