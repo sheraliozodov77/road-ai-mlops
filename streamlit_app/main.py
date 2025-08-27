@@ -46,10 +46,6 @@ def render_legend(legend_dict):
 st.sidebar.header("Model Controls")
 model_type = st.sidebar.selectbox("Model", ["segformer", "yolov11"])
 input_type = st.sidebar.radio("Input Type", ["Image", "Video"])
-st.sidebar.markdown("---")
-st.sidebar.info("Inference powered by ONNX models on AWS EC2.")
-st.sidebar.markdown("---")
-st.sidebar.markdown("<p style='font-size:12px;'>Made by Sherali Ozodov</p>", unsafe_allow_html=True)
 
 # =========================
 # IMAGE INPUT
