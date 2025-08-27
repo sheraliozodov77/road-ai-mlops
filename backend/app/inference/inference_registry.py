@@ -21,7 +21,10 @@ def download_model_from_s3(s3_key: str, local_path: str):
         raise
 
 
-def load_model_from_registry_or_local(model_name: str, stage: str, local_path: str, s3_key: str):
+def load_model_from_registry_or_local(model_name: str, stage: str, local_path: str, s3_key: str, providers=None):
+    if providers is None:
+        providers = ["CPUExecutionProvider"]  # Default to CPU if nothing is passed
+
     try:
         print(f"[MLflow] Trying to load {model_name} at stage {stage}...")
         client = mlflow.tracking.MlflowClient()
@@ -33,4 +36,4 @@ def load_model_from_registry_or_local(model_name: str, stage: str, local_path: s
         if not os.path.exists(local_path):
             print("[S3] Attempting to download model from S3...")
             download_model_from_s3(s3_key, local_path)
-        return ort.InferenceSession(local_path)
+        return ort.InferenceSession(local_path, providers=providers)
