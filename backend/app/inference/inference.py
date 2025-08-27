@@ -136,16 +136,35 @@ def run_segformer_video(model_session, video_path, output_path, size=1024, frame
     return avg_latency, total_frames
 
 
+def letterbox(img, new_shape=(640, 640), color=(114, 114, 114)):
+    shape = img.shape[:2]  # current shape [height, width]
+    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+    new_unpad = (int(round(shape[1] * r)), int(round(shape[0] * r)))
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]
+    dw /= 2  # divide padding into 2 sides
+    dh /= 2
+
+    resized = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
+    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    padded = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+    return padded, r, (dw, dh)
+
+
 def run_yolov11(model_session, img_bgr, size=640):
     start = time.time()
 
     orig_h, orig_w = img_bgr.shape[:2]
-    img_resized = cv2.resize(img_bgr, (size, size))
-    img_input = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+
+    # 1. Letterbox resize
+    img_letterboxed, r, (dw, dh) = letterbox(img_bgr, new_shape=(size, size))
+
+    # 2. Preprocess
+    img_input = cv2.cvtColor(img_letterboxed, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     img_input = np.transpose(img_input, (2, 0, 1))  # HWC → CHW
     img_input = np.expand_dims(img_input, axis=0).astype(np.float32)
 
-    # Run ONNX inference
+    # 3. Inference
     ort_inputs = {model_session.get_inputs()[0].name: img_input}
     ort_outs = model_session.run(None, ort_inputs)
     predictions = ort_outs[0].squeeze(0)  # shape: (N, 6)
@@ -153,21 +172,25 @@ def run_yolov11(model_session, img_bgr, size=640):
     detections = 0
     output_img = img_bgr.copy()
 
+    # 4. Postprocess boxes
     for pred in predictions:
-        # Get normalized coordinates and prediction info
         cx, cy, w, h, object_conf, *class_probs = pred.tolist()
         cls_id = int(np.argmax(class_probs))
         cls_conf = float(class_probs[cls_id])
         conf = object_conf * cls_conf
 
-        if conf < 0.35 or cls_id >= len(YOLO_CLASSES):
+        if conf < 0.3 or cls_id >= len(YOLO_CLASSES):
             continue
 
-        # Scale boxes to original resolution
-        x1 = int((cx - w / 2) * orig_w)
-        y1 = int((cy - h / 2) * orig_h)
-        x2 = int((cx + w / 2) * orig_w)
-        y2 = int((cy + h / 2) * orig_h)
+        # 5. De-scale (undo letterboxing)
+        x1 = ((cx - w / 2) * size - dw) / r
+        y1 = ((cy - h / 2) * size - dh) / r
+        x2 = ((cx + w / 2) * size - dw) / r
+        y2 = ((cy + h / 2) * size - dh) / r
+
+        # 6. Clamp
+        x1, y1 = max(0, int(x1)), max(0, int(y1))
+        x2, y2 = min(orig_w, int(x2)), min(orig_h, int(y2))
 
         label = f"{YOLO_CLASSES[cls_id]} {conf:.2f}"
         cv2.rectangle(output_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -185,6 +208,7 @@ def run_yolov11(model_session, img_bgr, size=640):
 
     wandb.log({"yolov11_latency": latency, "detections": detections})
     return output_img
+
 
 
 # =========================
