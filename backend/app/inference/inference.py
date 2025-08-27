@@ -139,32 +139,42 @@ def run_segformer_video(model_session, video_path, output_path, size=1024, frame
 def run_yolov11(model_session, img_bgr, size=640):
     start = time.time()
 
-    img = cv2.resize(img_bgr, (size, size))
-    img_input = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
-    img_input = np.transpose(img_input, (2, 0, 1))
+    orig_h, orig_w = img_bgr.shape[:2]
+    img_resized = cv2.resize(img_bgr, (size, size))
+    img_input = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+    img_input = np.transpose(img_input, (2, 0, 1))  # HWC → CHW
     img_input = np.expand_dims(img_input, axis=0).astype(np.float32)
 
+    # Run ONNX inference
     ort_inputs = {model_session.get_inputs()[0].name: img_input}
     ort_outs = model_session.run(None, ort_inputs)
-    predictions = ort_outs[0].squeeze(0)
+    predictions = ort_outs[0].squeeze(0)  # shape: (N, 6)
 
-    h, w = img.shape[:2]
-    output_img = img.copy()
     detections = 0
+    output_img = img_bgr.copy()
 
     for pred in predictions:
-        x1, y1, x2, y2 = map(int, pred[0:4])
-        conf = float(pred[4])
-        cls_id = int(pred[5])
+        # Get normalized coordinates and prediction info
+        cx, cy, w, h, object_conf, *class_probs = pred.tolist()
+        cls_id = int(np.argmax(class_probs))
+        cls_conf = float(class_probs[cls_id])
+        conf = object_conf * cls_conf
 
         if conf < 0.35 or cls_id >= len(YOLO_CLASSES):
             continue
 
-        detections += 1
-        label = YOLO_CLASSES[cls_id]
+        # Scale boxes to original resolution
+        x1 = int((cx - w / 2) * orig_w)
+        y1 = int((cy - h / 2) * orig_h)
+        x2 = int((cx + w / 2) * orig_w)
+        y2 = int((cy + h / 2) * orig_h)
+
+        label = f"{YOLO_CLASSES[cls_id]} {conf:.2f}"
         cv2.rectangle(output_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(output_img, f"{label} {conf:.2f}", (x1, y1 - 10),
+        cv2.putText(output_img, label, (x1, max(y1 - 10, 0)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+        detections += 1
 
     latency = time.time() - start
     with mlflow.start_run(run_name="yolov11_inference", nested=True):
@@ -175,6 +185,7 @@ def run_yolov11(model_session, img_bgr, size=640):
 
     wandb.log({"yolov11_latency": latency, "detections": detections})
     return output_img
+
 
 # =========================
 # Local ONNX Loader (used by FastAPI)
