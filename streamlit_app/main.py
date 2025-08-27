@@ -8,7 +8,6 @@ import os
 import time
 
 st.set_page_config(page_title="Road AI Demo", layout="wide")
-
 st.title("🛣️ Road Segmentation & Defect Detection")
 st.caption("FastAPI · Streamlit · ONNX · YOLOv11 · SegFormer · MLflow · W&B · Docker · AWS")
 
@@ -52,64 +51,77 @@ input_type = st.sidebar.radio("Input Type", ["Image", "Video"])
 # =========================
 if input_type == "Image":
     uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
-    if uploaded_file:
-        start = time.time()
+
+    if uploaded_file and "prediction_result" not in st.session_state:
         with st.spinner("Running inference..."):
+            start = time.time()
             files = {"file": uploaded_file.getvalue()}
             data = {"model_type": model_type}
             response = requests.post(f"{API_URL}/predict/image", files=files, data=data)
-        end = time.time()
+            end = time.time()
 
         if response.status_code == 200 and response.json().get("status") == "success":
-            result = response.json()["result"]
+            result_base64 = response.json()["result"]
             s3_url = response.json()["url"]
-            result_image = Image.open(io.BytesIO(base64.b64decode(result)))
+            result_bytes = base64.b64decode(result_base64)
+            result_image = Image.open(io.BytesIO(result_bytes))
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(uploaded_file, caption="Original Input", use_container_width=True)
-            with col2:
-                st.image(result_image, caption="Predicted Output", use_container_width=True)
-                st.download_button(
-                    "Download Prediction",
-                    data=base64.b64decode(result),
-                    file_name="prediction.png",
-                    mime="image/png"
-                )
-                if model_type == "segformer":
-                    render_legend(CLASS_LEGEND)
-            st.success(f"✅ Prediction completed in {end - start:.2f} seconds")
+            st.session_state.prediction_result = {
+                "original": uploaded_file,
+                "result_img": result_image,
+                "result_bytes": result_bytes,
+                "runtime": end - start
+            }
         else:
             st.error("❌ API Error: " + str(response.text))
+
+    if "prediction_result" in st.session_state:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(st.session_state.prediction_result["original"], caption="Original Input", use_container_width=True)
+        with col2:
+            st.image(st.session_state.prediction_result["result_img"], caption="Predicted Output", use_container_width=True)
+            st.download_button(
+                "Download Prediction",
+                data=st.session_state.prediction_result["result_bytes"],
+                file_name="prediction.png",
+                mime="image/png"
+            )
+            if model_type == "segformer":
+                render_legend(CLASS_LEGEND)
+        st.success(f"✅ Prediction completed in {st.session_state.prediction_result['runtime']:.2f} seconds")
 
 # =========================
 # VIDEO INPUT
 # =========================
 elif input_type == "Video":
-    uploaded_video = st.file_uploader("Upload Video", type=["mp4", "mov"], label_visibility="collapsed")
+    uploaded_video = st.file_uploader("Upload Video", type=["mp4", "mov", "mpeg"], label_visibility="collapsed")
     if uploaded_video:
-        with st.spinner("Uploading & starting inference..."):
+        with st.spinner("📤 Uploading video and starting inference..."):
             files = {"file": uploaded_video.getvalue()}
             data = {"model_type": model_type}
             response = requests.post(f"{API_URL}/predict/video", files=files, data=data)
 
         if response.status_code == 200:
             job_id = response.json()["job_id"]
-            st.info(f"Job ID: {job_id}")
-            start = time.time()
-            status = "processing"
-            while status == "processing":
-                job_status = requests.get(f"{API_URL}/jobs/status", params={"job_id": job_id})
-                status = job_status.json().get("status")
-                time.sleep(2)
-            end = time.time()
+            st.success(f"🎯 Job started! Job ID: `{job_id}`")
+            with st.spinner("🔄 Processing... Please wait. This may take several minutes for long videos."):
+
+                start = time.time()
+                status = "processing"
+                while status == "processing":
+                    time.sleep(2)  # Wait between polls
+                    job_status = requests.get(f"{API_URL}/jobs/status", params={"job_id": job_id})
+                    status = job_status.json().get("status")
+
+                end = time.time()
 
             if status == "completed":
                 video_url = job_status.json().get("output_url")
                 st.video(f"{API_URL}{video_url}")
-                st.success(f"✅ Video inference finished in {end - start:.2f} seconds")
+                st.success(f"✅ Video inference completed in {end - start:.2f} seconds")
             else:
-                st.error("❌ Job failed or not found.")
+                st.error("❌ Job failed or could not be found.")
         else:
             st.error("❌ API Error: " + str(response.text))
 
