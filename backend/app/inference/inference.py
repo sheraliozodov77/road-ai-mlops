@@ -135,19 +135,31 @@ def run_yolov11(model_session, img_bgr, size=640):
     ort_outs = model_session.run(None, ort_inputs)
     predictions = ort_outs[0].squeeze(0)
 
+    h, w = img.shape[:2]
     latency = time.time() - start
     detections = 0
 
     for pred in predictions:
-        conf = pred[4]
+        cx, cy, bw, bh = pred[0:4]
+        object_conf = pred[4]
+        class_scores = pred[5:]
+        cls_id = int(np.argmax(class_scores))
+        cls_score = float(np.max(class_scores))
+        conf = object_conf * cls_score
+
         if conf < 0.35:
             continue
+
+        x1 = int((cx - bw / 2) * w)
+        y1 = int((cy - bh / 2) * h)
+        x2 = int((cx + bw / 2) * w)
+        y2 = int((cy + bh / 2) * h)
+
         detections += 1
-        cls_id = int(pred[5])
         label = YOLO_CLASSES[cls_id] if cls_id < len(YOLO_CLASSES) else str(cls_id)
-        x1, y1, x2, y2 = map(int, pred[0:4])
         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(img, f"{label} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.putText(img, f"{label} {conf:.2f}", (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
     with mlflow.start_run(run_name="yolov11_inference", nested=True):
         mlflow.log_param("model", "YOLOv11")

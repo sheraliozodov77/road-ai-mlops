@@ -11,6 +11,8 @@ import base64
 import time
 import json
 from datetime import datetime
+import logging
+import mlflow
 
 from app.inference.inference import (
     load_onnx_model, run_segformer, run_yolov11
@@ -63,6 +65,8 @@ except Exception as e:
     print(f"❌ Model loading failed: {e}")
     raise e
 
+logging.basicConfig(level=logging.INFO)
+
 def read_image(file: UploadFile):
     from PIL import Image
     image = Image.open(io.BytesIO(file.file.read())).convert("RGB")
@@ -74,6 +78,7 @@ async def predict_image(
     model_type: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    start_time = time.time()
     img = read_image(file)
     filename = file.filename
     job_id = str(uuid.uuid4())
@@ -92,20 +97,31 @@ async def predict_image(
 
     s3_url = upload_file_to_s3(output_path, "outputs")
 
+    runtime = round(time.time() - start_time, 2)
+
     prediction = Prediction(
         id=job_id,
         filename=filename,
         input_type="image",
         model_name=model_type,
         status="completed",
-        runtime="<1s",
+        runtime=f"{runtime}s",
         created_at=datetime.utcnow(),
         output_path=s3_url
     )
     db.add(prediction)
     db.commit()
 
-    log_inference_metrics(model_type, "<1s", "image", filename, output_path)
+    log_inference_metrics(model_type, f"{runtime}s", "image", filename, s3_url)
+
+    with mlflow.start_run(run_name=f"{model_type}_image"):
+        mlflow.log_param("model", model_type)
+        mlflow.log_param("input_type", "image")
+        mlflow.log_param("filename", filename)
+        mlflow.log_param("output_path", s3_url)
+        mlflow.log_metric("runtime_seconds", runtime)
+
+    logging.info(f"[IMAGE] ✅ {model_type} | Job: {job_id} | Runtime: {runtime}s | S3: {s3_url}")
 
     return {
         "status": "success",
@@ -153,6 +169,7 @@ def get_job_status(job_id: str, db: Session = Depends(get_db)):
     return {"status": job.status, "output_url": job.output_path}
 
 def process_video(input_path, output_path, model_type, job_id, filename, db):
+    start_time = time.time()
     cap = cv2.VideoCapture(input_path)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -173,14 +190,24 @@ def process_video(input_path, output_path, model_type, job_id, filename, db):
     out.release()
 
     s3_url = upload_file_to_s3(output_path, "outputs")
+    runtime = round(time.time() - start_time, 2)
 
     job = db.query(Prediction).filter(Prediction.id == job_id).first()
     job.status = "completed"
     job.output_path = s3_url
-    job.runtime = "~30s"
+    job.runtime = f"{runtime}s"
     db.commit()
 
-    log_inference_metrics(model_type, "~30s", "video", filename, output_path)
+    log_inference_metrics(model_type, f"{runtime}s", "video", filename, s3_url)
+
+    with mlflow.start_run(run_name=f"{model_type}_video"):
+        mlflow.log_param("model", model_type)
+        mlflow.log_param("input_type", "video")
+        mlflow.log_param("filename", filename)
+        mlflow.log_param("output_path", s3_url)
+        mlflow.log_metric("runtime_seconds", runtime)
+
+    logging.info(f"[VIDEO] ✅ {model_type} | Job: {job_id} | Runtime: {runtime}s | S3: {s3_url}")
 
 @app.get("/history")
 def get_history(db: Session = Depends(get_db)):
