@@ -138,40 +138,38 @@ def run_segformer_video(model_session, video_path, output_path, size=1024, frame
 def run_yolov11(model_session, img_bgr, size=640):
     start = time.time()
 
+    # Resize and normalize input
     img = cv2.resize(img_bgr, (size, size))
     img_input = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     img_input = np.transpose(img_input, (2, 0, 1))
     img_input = np.expand_dims(img_input, axis=0).astype(np.float32)
 
+    # Run ONNX model
     ort_inputs = {model_session.get_inputs()[0].name: img_input}
     ort_outs = model_session.run(None, ort_inputs)
     predictions = ort_outs[0].squeeze(0)
 
-    h, w = img.shape[:2]
+    # Final image for drawing
+    output_img = img.copy()
+    h, w = output_img.shape[:2]
     latency = time.time() - start
     detections = 0
 
     for pred in predictions:
-        cx, cy, bw, bh = pred[0:4]
-        object_conf = pred[4]
-        class_scores = pred[5:]
-        cls_id = int(np.argmax(class_scores))
-        cls_score = float(np.max(class_scores))
-        conf = object_conf * cls_score
+        x1, y1, x2, y2 = map(int, pred[0:4])
+        conf = float(pred[4])
+        cls_id = int(pred[5])
 
         if conf < 0.35:
             continue
 
-        x1 = int((cx - bw / 2) * w)
-        y1 = int((cy - bh / 2) * h)
-        x2 = int((cx + bw / 2) * w)
-        y2 = int((cy + bh / 2) * h)
-
         detections += 1
         label = YOLO_CLASSES[cls_id] if cls_id < len(YOLO_CLASSES) else str(cls_id)
-        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(img, f"{label} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.rectangle(output_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(output_img, f"{label} {conf:.2f}", (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
+    # MLflow + W&B logging
     with mlflow.start_run(run_name="yolov11_inference", nested=True):
         mlflow.log_param("model", "YOLOv11")
         mlflow.log_param("input_size", size)
@@ -179,7 +177,8 @@ def run_yolov11(model_session, img_bgr, size=640):
         mlflow.log_metric("detections", detections)
 
     wandb.log({"yolov11_latency": latency, "detections": detections})
-    return img
+    return output_img
+
 
 # =========================
 # Local ONNX Loader (used by FastAPI)
