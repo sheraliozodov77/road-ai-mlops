@@ -21,19 +21,28 @@ def download_model_from_s3(s3_key: str, local_path: str):
         raise
 
 
-def load_model_from_registry_or_local(model_name: str, stage: str, local_path: str, s3_key: str, providers=None):
-    if providers is None:
-        providers = ["CPUExecutionProvider"]  # Default to CPU if nothing is passed
-
+def load_model_from_registry_or_local(model_name: str, stage: str, local_path: str, s3_key: str):
     try:
         print(f"[MLflow] Trying to load {model_name} at stage {stage}...")
         client = mlflow.tracking.MlflowClient()
         model_uri = f"models:/{model_name}/{stage}"
-        return mlflow.pyfunc.load_model(model_uri)
+
+        # Try downloading model from registry (get actual ONNX file path)
+        model_details = client.get_latest_versions(model_name, stages=[stage])[0]
+        artifacts = client.list_artifacts(model_details.run_id)
+        onnx_artifact = next((a for a in artifacts if a.path.endswith(".onnx")), None)
+        if onnx_artifact:
+            model_path = mlflow.artifacts.download_artifacts(run_id=model_details.run_id, artifact_path=onnx_artifact.path)
+            print(f"[MLflow] ✅ Downloaded ONNX model: {model_path}")
+            return ort.InferenceSession(model_path)
+
+        print(f"[MLflow] ⚠️ No ONNX model found in registry for {model_name}. Falling back to local.")
+
     except Exception as e:
         print(f"[MLflow] Failed to load model from registry: {e}")
-        print(f"[Local] Loading ONNX from disk: {local_path}")
-        if not os.path.exists(local_path):
-            print("[S3] Attempting to download model from S3...")
-            download_model_from_s3(s3_key, local_path)
-        return ort.InferenceSession(local_path, providers=providers)
+
+    # Local fallback
+    if not os.path.exists(local_path):
+        print("[S3] Attempting to download model from S3...")
+        download_model_from_s3(s3_key, local_path)
+    return ort.InferenceSession(local_path)

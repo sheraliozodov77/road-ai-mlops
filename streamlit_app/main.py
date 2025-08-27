@@ -103,40 +103,60 @@ if input_type == "Image":
                 render_legend(CLASS_LEGEND)
         st.success(f"✅ Prediction completed in {st.session_state.prediction_time:.2f} seconds")
 
-        
+
 # =========================
-# VIDEO INPUT
+# VIDEO INPUT with job state tracking
 # =========================
 elif input_type == "Video":
-    uploaded_video = st.file_uploader("Upload Video", type=["mp4", "mov", "mpeg"], label_visibility="collapsed")
+    if "video_job_id" not in st.session_state:
+        st.session_state.video_file = None
+        st.session_state.video_job_id = None
+        st.session_state.video_output_url = None
+        st.session_state.video_runtime = None
+
+    uploaded_video = st.file_uploader("Upload Video", type=["mp4", "mov"], label_visibility="collapsed", key="video_upload")
+
     if uploaded_video:
-        with st.spinner("📤 Uploading video and starting inference..."):
-            files = {"file": uploaded_video.getvalue()}
-            data = {"model_type": model_type}
-            response = requests.post(f"{API_URL}/predict/video", files=files, data=data)
+        if st.session_state.video_file != uploaded_video:
+            st.session_state.video_file = uploaded_video
+            st.session_state.video_job_id = None
+            st.session_state.video_output_url = None
+            st.session_state.video_runtime = None
 
-        if response.status_code == 200:
-            job_id = response.json()["job_id"]
-            st.success(f"🎯 Job started! Job ID: `{job_id}`")
-            with st.spinner("🔄 Processing... Please wait. This may take several minutes for long videos."):
+            with st.spinner("Uploading video & starting inference..."):
+                files = {"file": uploaded_video.getvalue()}
+                data = {"model_type": model_type}
+                response = requests.post(f"{API_URL}/predict/video", files=files, data=data)
 
-                start = time.time()
-                status = "processing"
-                while status == "processing":
-                    time.sleep(2)  # Wait between polls
-                    job_status = requests.get(f"{API_URL}/jobs/status", params={"job_id": job_id})
-                    status = job_status.json().get("status")
+                if response.status_code == 200:
+                    job_id = response.json()["job_id"]
+                    st.session_state.video_job_id = job_id
+                    st.success(f"🎬 Job started! Job ID: {job_id}")
+                else:
+                    st.error("❌ API Error: " + str(response.text))
 
-                end = time.time()
+    # Poll the job status
+    if st.session_state.video_job_id and st.session_state.video_output_url is None:
+        with st.spinner("📼 Processing... Please wait. This may take several minutes for long videos."):
+            start = time.time()
+            status = "processing"
+            while status == "processing":
+                job_status = requests.get(f"{API_URL}/jobs/status", params={"job_id": st.session_state.video_job_id})
+                status = job_status.json().get("status")
+                time.sleep(2)
+            end = time.time()
 
             if status == "completed":
-                video_url = job_status.json().get("output_url")
-                st.video(f"{API_URL}{video_url}")
-                st.success(f"✅ Video inference completed in {end - start:.2f} seconds")
+                st.session_state.video_output_url = job_status.json().get("output_url")
+                st.session_state.video_runtime = round(end - start, 2)
             else:
-                st.error("❌ Job failed or could not be found.")
-        else:
-            st.error("❌ API Error: " + str(response.text))
+                st.error("❌ Job failed or not found.")
+                st.session_state.video_output_url = None
+
+    # Display video if available
+    if st.session_state.video_output_url:
+        st.video(f"{API_URL}{st.session_state.video_output_url}")
+        st.success(f"✅ Video inference completed in {st.session_state.video_runtime:.2f} seconds")
 
 # =========================
 # History Viewer
