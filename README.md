@@ -1,50 +1,90 @@
 # 🛣️ Road AI – Infrastructure Defect Detection
 
-A production-ready AI system for **road segmentation** (SegFormer) and **defect detection** (YOLOv11), designed for UAV footage and deployed with full MLOps best practices.
+A production-ready AI system for **road segmentation** (SegFormer) and **defect detection** (YOLOv11), designed for UAV-based monitoring and deployed using full MLOps best practices.
 
 ---
 
 ## 🚀 Features
 
-✅ Streamlit UI to upload image/video  
-✅ FastAPI backend with ONNX inference  
-✅ AWS S3 for storage, RDS for logs  
-✅ MLflow + Weights & Biases tracking  
-✅ Prometheus + Grafana for monitoring  
-✅ GitHub Actions CI/CD to EC2  
+✅ Streamlit UI for image/video input  
+✅ FastAPI backend with ONNX inference (SegFormer + YOLOv11)  
+✅ AWS S3 for output storage, RDS for prediction logs  
+✅ MLflow & Weights & Biases for experiment tracking  
+✅ Prometheus + Grafana monitoring dashboards  
+✅ GitHub Actions CI/CD pipeline to EC2 instance  
+✅ Downloadable predictions via Streamlit UI
 
 ---
 
 ## 🔧 Setup Instructions
 
-### 1. Clone the repo
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/sheraliozodov77/road-ai-mlops.git
 cd road-ai-mlops
 ```
 
-### 2. Set up AWS
+### 2. Configure AWS Infrastructure
 
-- Create EC2 (GPU), RDS (PostgreSQL), S3 bucket
-- Add `.env.prod` or use AWS Secrets Manager
+Provision:
+- ✅ EC2 instance (with GPU support, e.g., `g4dn.xlarge`)
+- ✅ RDS PostgreSQL instance
+- ✅ S3 bucket for predictions
 
-### 3. Build + Run Backend
+Add environment variables to `.env` or Secrets Manager:
+
+```bash
+POSTGRES_HOST=your-rds-host
+POSTGRES_PORT=5432
+POSTGRES_DB=roadai
+POSTGRES_USER=road_admin
+POSTGRES_PASSWORD=your-password
+
+S3_BUCKET=road-ai-prod
+S3_MODEL_BUCKET=road-ai-models
+SEGFORMER_S3_KEY=models/segformer/segformer-b4-uavid.onnx
+YOLOV11_S3_KEY=models/yolov11/yolov11m.onnx
+
+MLFLOW_TRACKING_URI=http://localhost:5000
+WANDB_API_KEY=your-wandb-key
+
+AWS_ACCESS_KEY_ID=your-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+ENV=production
+
+API_URL=http://<EC2_PUBLIC_IP>:8000
+```
+
+---
+
+## 🚀 Run Backend
 
 ```bash
 cd backend
 docker compose -f ../docker-compose.prod.yml up --build -d
 ```
 
-Accessible at: `http://<EC2-IP>:8000/docs`
+Access API docs at: `http://<EC2-IP>:8000/docs`
 
 ---
 
-## 📊 Monitoring
+## 🧠 Run Streamlit Frontend
 
-- Prometheus: `http://<EC2-IP>:9090`
-- Grafana: `http://<EC2-IP>:3000`
-- Dashboard JSON: `grafana/road-ai-fastapi-dashboard.json`
+```bash
+cd streamlit_app
+streamlit run main.py
+```
+
+Access UI at: `http://<EC2-IP>:8501`
+
+---
+
+## 📊 Monitoring Dashboard
+
+- **Prometheus**: `http://<EC2-IP>:9090`
+- **Grafana**: `http://<EC2-IP>:3000`  
+  Load dashboard from: `grafana/road-ai-fastapi-dashboard.json`
 
 ---
 
@@ -52,24 +92,30 @@ Accessible at: `http://<EC2-IP>:8000/docs`
 
 | Route              | Method | Description                  |
 |--------------------|--------|------------------------------|
-| `/predict/image`   | POST   | Upload image + select model |
-| `/predict/video`   | POST   | Upload video + monitor job  |
-| `/jobs/status`     | GET    | Check job progress          |
-| `/history`         | GET    | Past predictions             |
-| `/metrics`         | GET    | Prometheus metrics          |
+| `/predict/image`   | POST   | Upload image & select model  |
+| `/predict/video`   | POST   | Upload video & run inference |
+| `/jobs/status`     | GET    | Track video job status       |
+| `/history`         | GET    | View recent predictions      |
+| `/metrics`         | GET    | Prometheus scrape endpoint   |
 
 ---
 
-## ⚙️ CI/CD (GitHub Actions)
+## ⚙️ GitHub Actions CI/CD
 
-- Auto-deploy on `main` push
-- SSHs into EC2 and restarts backend
+Automatically deploys on push to `master` branch.
 
-Required Secrets:
+- ✅ SSHs into EC2
+- ✅ Pulls latest code & restarts backend
+
+Required GitHub Secrets:
 - `EC2_HOST`, `EC2_SSH_KEY`
 
 ---
 
-## 👨‍💻 Authors
+## 👨‍💻 Author
 
-Built by Sherali Ozodov
+**Made by Sherali Ozodov**
+
+---
+
+🗓️ Last updated: 2025-08-27
