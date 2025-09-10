@@ -1,22 +1,53 @@
-# 🛣️ Road AI – Infrastructure Defect Detection
+# 🛣️ Road AI – Infrastructure Defect Detection (MLOps Production Deployment)
 
-A production-ready AI system for **road segmentation** (SegFormer) and **defect detection** (YOLOv11), designed for UAV-based monitoring and deployed using full MLOps best practices.
-
----
-
-## 🚀 Features
-
-✅ Streamlit UI for image/video input  
-✅ FastAPI backend with ONNX inference (SegFormer + YOLOv11)  
-✅ AWS S3 for output storage, RDS for prediction logs  
-✅ MLflow & Weights & Biases for experiment tracking  
-✅ Prometheus + Grafana monitoring dashboards  
-✅ GitHub Actions CI/CD pipeline to EC2 instance  
-✅ Downloadable predictions via Streamlit UI
+A full-stack, production-grade AI system for **road segmentation** (SegFormer) and **defect detection** (YOLOv11), purpose-built for **UAV-based road monitoring** and deployed with industry-standard **MLOps best practices**.
 
 ---
 
-## 🔧 Setup Instructions
+## 🚀 Key Features
+
+✅ **Streamlit UI** for uploading images/videos & viewing predictions  
+✅ **FastAPI backend** with ONNX-optimized inference  
+✅ **YOLOv11m** for defect detection, **SegFormer-B4** for road segmentation  
+✅ **MLflow** and **Weights & Biases (W&B)** for inference tracking  
+✅ **Prometheus + Grafana** for monitoring latency, usage, and alerts  
+✅ **S3** for output storage, **RDS PostgreSQL** for prediction logs  
+✅ **GitHub Actions** CI/CD pipeline to auto-deploy to **AWS EC2**  
+✅ **Fully Dockerized** with separate containers for backend, frontend, MLflow  
+
+---
+
+## 🧠 Model Integration
+
+- ✅ `SegFormer-B4` (semantic segmentation of roads) — 8-class UAVID-style output
+- ✅ `YOLOv11m` (object detection of cracks, potholes, etc.)
+- ✅ All models run using **ONNXRuntime** for fast, optimized inference
+- ✅ Output stored and visualized in real time
+
+---
+
+## 🏗️ Infrastructure Overview
+
+### 🧱 Services (Dockerized)
+
+| Component    | Port   | Description                          |
+|--------------|--------|--------------------------------------|
+| `backend`    | 8000   | FastAPI ML inference API             |
+| `streamlit`  | 8501   | Frontend web UI for predictions      |
+| `mlflow`     | 5000   | Experiment tracking & model registry |
+| `prometheus` | 9090   | Monitoring metrics endpoint          |
+| `grafana`    | 3000   | Visualization of metrics dashboards  |
+
+### ☁️ Cloud Hosting
+
+- EC2 Instance: `t3.medium` or `g4dn.xlarge` (for GPU inference)
+- Elastic IP for stable deployment access
+- S3 Buckets for outputs, ONNX models
+- RDS PostgreSQL for prediction history logging
+
+---
+
+## 📦 Setup Instructions
 
 ### 1. Clone the Repository
 
@@ -28,13 +59,13 @@ cd road-ai-mlops
 ### 2. Configure AWS Infrastructure
 
 Provision:
-- ✅ EC2 instance (with GPU support, e.g., `g4dn.xlarge`)
+- ✅ EC2 instance (t3.medium or g4dn.xlarge)
 - ✅ RDS PostgreSQL instance
-- ✅ S3 bucket for predictions
+- ✅ S3 buckets for model & output storage
 
-Add environment variables to `.env` or Secrets Manager:
+Create a `.env` file with:
 
-```bash
+```env
 POSTGRES_HOST=your-rds-host
 POSTGRES_PORT=5432
 POSTGRES_DB=roadai
@@ -51,44 +82,30 @@ WANDB_API_KEY=your-wandb-key
 
 AWS_ACCESS_KEY_ID=your-key-id
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
+API_URL=http://backend:8000
 ENV=production
-
-API_URL=http://<EC2_PUBLIC_IP>:8000
 ```
 
 ---
 
-## 🚀 Run Backend
+## 🐳 Dockerized Deployment
+
+### 1. Build & Run
 
 ```bash
-cd backend
-docker compose -f ../docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-Access API docs at: `http://<EC2-IP>:8000/docs`
+- Backend: `http://<EC2-IP>:8000/docs`
+- Frontend: `http://<EC2-IP>:8501`
+- MLflow: `http://<EC2-IP>:5000`
+- Prometheus: `http://<EC2-IP>:9090`
+- Grafana: `http://<EC2-IP>:3000`
 
 ---
 
-## 🧠 Run Streamlit Frontend
-
-```bash
-cd streamlit_app
-streamlit run main.py
-```
-
-Access UI at: `http://<EC2-IP>:8501`
-
----
-
-## 📊 Monitoring Dashboard
-
-- **Prometheus**: `http://<EC2-IP>:9090`
-- **Grafana**: `http://<EC2-IP>:3000`  
-  Load dashboard from: `grafana/road-ai-fastapi-dashboard.json`
-
----
-
-## 🧪 API Endpoints
+## 🌐 API Endpoints
 
 | Route              | Method | Description                  |
 |--------------------|--------|------------------------------|
@@ -100,22 +117,49 @@ Access UI at: `http://<EC2-IP>:8501`
 
 ---
 
-## ⚙️ GitHub Actions CI/CD
+## 📈 Monitoring & Experiment Tracking
 
-Automatically deploys on push to `master` branch.
+- ✅ **MLflow** logs latency, model metadata, artifacts
+- ✅ **W&B** logs inference performance in real time
+- ✅ **Prometheus + Grafana** dashboards for API request rate, latency, job usage
+- ✅ `/metrics` endpoint exposed via FastAPI
 
-- ✅ SSHs into EC2
-- ✅ Pulls latest code & restarts backend
+---
 
-Required GitHub Secrets:
-- `EC2_HOST`, `EC2_SSH_KEY`
+## 🔁 CI/CD Deployment with GitHub Actions
+
+### ✅ Auto Deployment Flow
+On push to `master`:
+- SSH into EC2
+- Pull latest code
+- Rebuild Docker containers
+- Register models to MLflow (optional)
+
+Required secrets:
+```yaml
+EC2_HOST=your.elastic.ip
+EC2_SSH_KEY=your-private-ssh-key
+```
+
+---
+
+## 🛡️ Resilience & Scaling
+
+- ✅ Robust retry/error handling in API
+- ✅ Secrets loaded securely via `.env`
+- ✅ `restart: always` in Docker Compose for recovery
+- 🔜 Support for GPU inference, async jobs, batch processing
 
 ---
 
 ## 👨‍💻 Author
 
-**Made by Sherali Ozodov**
+**Built by Sherali Ozodov**  
+ML Engineer
+
+🔗 GitHub: [github.com/sheraliozodov77](https://github.com/sheraliozodov77)  
 
 ---
 
-🗓️ Last updated: 2025-08-27
+🗓️ **Last updated:** 2025-08-28  
+🏷️ **Tags:** MLOps · Road AI · SegFormer · YOLO · Streamlit · FastAPI · EC2 · Docker · MLflow · Prometheus
