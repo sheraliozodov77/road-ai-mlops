@@ -1,4 +1,4 @@
-name: "Deploy to EC2"
+name: "🚀 Deploy to EC2"
 
 on:
   push:
@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: 📦 Checkout code
       uses: actions/checkout@v3
 
-    - name: Setup SSH
+    - name: 🔑 Setup SSH
       uses: webfactory/ssh-agent@v0.9.0
       with:
         ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
@@ -20,13 +20,20 @@ jobs:
     - name: 🛠 Deploy to EC2
       run: |
         ssh -T -o ConnectTimeout=10 -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
-          echo "Connected to EC2"
+          echo "✅ Connected to EC2"
 
           cd ~/road-ai-mlops
-          echo "Pulling latest code from GitHub..."
+          echo "📥 Pulling latest code from GitHub..."
           git pull origin master
 
-          echo "Checking Docker Compose V2..."
+          echo "📦 Exporting AWS credentials for DVC..."
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+          echo "📦 Running DVC pull for ONNX models..."
+          dvc pull || echo "⚠️ DVC pull failed"
+
+          echo "🔧 Checking Docker Compose V2..."
           if ! docker compose version &>/dev/null; then
             echo "Installing Docker Compose V2..."
             sudo mkdir -p /usr/local/lib/docker/cli-plugins

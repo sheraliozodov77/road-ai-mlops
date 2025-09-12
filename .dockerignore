@@ -1,0 +1,4 @@
+# .dockerignore
+models/*
+!models/*.dvc
+!models/.gitignore
