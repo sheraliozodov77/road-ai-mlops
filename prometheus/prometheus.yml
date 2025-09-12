@@ -4,4 +4,4 @@ global:
 scrape_configs:
   - job_name: "fastapi"
     static_configs:
-      - targets: ["host.docker.internal:8000"]  # or "backend:8000" inside docker-compose
+      - targets: ["backend:8000"]
