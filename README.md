@@ -1,4 +1,4 @@
-# 🛣️ Road AI – Infrastructure Defect Detection (MLOps Production Deployment)
+# Road AI – Infrastructure Defect Detection (MLOps Production Deployment)
 
 A full-stack, production-grade AI system for **road segmentation** (SegFormer) and **defect detection** (YOLOv11), purpose-built for **UAV-based road monitoring** and deployed with industry-standard **MLOps best practices**.
 
@@ -12,6 +12,7 @@ A full-stack, production-grade AI system for **road segmentation** (SegFormer) a
 ✅ **MLflow** and **Weights & Biases (W&B)** for inference tracking  
 ✅ **Prometheus + Grafana** for monitoring latency, usage, and alerts  
 ✅ **S3** for output storage, **RDS PostgreSQL** for prediction logs  
+✅ **DVC + S3 remote** for model versioning & reproducibility  
 ✅ **GitHub Actions** CI/CD pipeline to auto-deploy to **AWS EC2**  
 ✅ **Fully Dockerized** with separate containers for backend, frontend, MLflow  
 
@@ -42,7 +43,7 @@ A full-stack, production-grade AI system for **road segmentation** (SegFormer) a
 
 - EC2 Instance: `t3.medium` or `g4dn.xlarge` (for GPU inference)
 - Elastic IP for stable deployment access
-- S3 Buckets for outputs, ONNX models
+- S3 Buckets for outputs, ONNX models, and DVC storage
 - RDS PostgreSQL for prediction history logging
 
 ---
@@ -61,7 +62,7 @@ cd road-ai-mlops
 Provision:
 - ✅ EC2 instance (t3.medium or g4dn.xlarge)
 - ✅ RDS PostgreSQL instance
-- ✅ S3 buckets for model & output storage
+- ✅ S3 buckets for model, output, and DVC storage
 
 Create a `.env` file with:
 
@@ -89,9 +90,47 @@ ENV=production
 
 ---
 
-## 🐳 Dockerized Deployment
+## 📦 DVC Integration for Model Versioning
 
-### 1. Build & Run
+We use **DVC + S3** to version and pull ONNX models in production.
+
+### ✅ Add remote:
+
+```bash
+dvc remote add -d s3remote s3://road-ai-dvc-storage
+dvc remote modify s3remote access_key_id $AWS_ACCESS_KEY_ID
+dvc remote modify s3remote secret_access_key $AWS_SECRET_ACCESS_KEY
+dvc remote modify s3remote region us-east-1
+```
+
+### ✅ Track models:
+
+```bash
+dvc add models/segformer/segformer-b4-uavid.onnx
+dvc add models/yolov11/yolov11m.onnx
+git add models/*.dvc .dvc/config
+git commit -m "Track ONNX models with DVC"
+```
+
+### ✅ Push to S3 remote:
+
+```bash
+dvc push
+```
+
+### ✅ On EC2 (in GitHub Actions or SSH):
+
+```bash
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+dvc pull
+```
+
+DVC ensures **reproducibility**, **efficient storage**, and **data versioning**.
+
+---
+
+## 🐳 Dockerized Deployment
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
@@ -131,7 +170,9 @@ docker compose -f docker-compose.prod.yml up --build -d
 ### ✅ Auto Deployment Flow
 On push to `master`:
 - SSH into EC2
+- Export AWS credentials
 - Pull latest code
+- Run `dvc pull` for ONNX models
 - Rebuild Docker containers
 - Register models to MLflow (optional)
 
@@ -139,16 +180,9 @@ Required secrets:
 ```yaml
 EC2_HOST=your.elastic.ip
 EC2_SSH_KEY=your-private-ssh-key
+AWS_ACCESS_KEY_ID=your-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-key
 ```
-
----
-
-## 🛡️ Resilience & Scaling
-
-- ✅ Robust retry/error handling in API
-- ✅ Secrets loaded securely via `.env`
-- ✅ `restart: always` in Docker Compose for recovery
-- 🔜 Support for GPU inference, async jobs, batch processing
 
 ---
 
@@ -157,9 +191,9 @@ EC2_SSH_KEY=your-private-ssh-key
 **Built by Sherali Ozodov**  
 ML Engineer
 
-🔗 GitHub: [github.com/sheraliozodov77](https://github.com/sheraliozodov77)  
+🔗 GitHub: [github.com/sheraliozodov77](https://github.com/sheraliozodov77)
 
 ---
 
-🗓️ **Last updated:** 2025-08-28  
-🏷️ **Tags:** MLOps · Road AI · SegFormer · YOLO · Streamlit · FastAPI · EC2 · Docker · MLflow · Prometheus
+🗓️ **Last updated:** 2025-09-12  
+🏷️ **Tags:** MLOps · Road AI · SegFormer · YOLO · Streamlit · FastAPI · EC2 · Docker · MLflow · Prometheus · DVC
