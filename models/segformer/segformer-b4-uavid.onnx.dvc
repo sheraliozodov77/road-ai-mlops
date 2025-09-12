@@ -1,0 +1,5 @@
+outs:
+- md5: 34666707f11599fef9592ae7c419f03a
+  size: 257226976
+  hash: md5
+  path: segformer-b4-uavid.onnx
